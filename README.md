@@ -19,14 +19,15 @@ Cross-platform: **iOS · Android · Web**.
 
 ## Features
 
-- Cinematic dark ops-room UI with role color accents and pulse status indicators
+- **Realtime parallel agents** — each stage fires multiple Claude calls concurrently (`Promise.allSettled`); UI updates as each stream/promise races in
+- **Streaming activity** — Anthropic SSE token deltas update the feed and agent task lines live (falls back to typed scripted lines without a key)
+- **Reactive story board** — backlog cards land as soon as Claude returns story JSON; status moves when stage work completes (not on a fake beat clock)
+- Premium cinematic dark UI: ambient orbs/grid, glass panels, Reanimated entrances, pulse rings, thinking shimmer, press-scale CTAs
 - Launch form for product name, description, goals, constraints (+ example brief)
-- **Claude-powered** agent chat + story JSON generation (Claude Opus 5.5)
-- Thinking / Writing status while awaiting model responses
-- Stages: Discovery → Architecture → Story breakdown → Planning → Impl. kickoff → QA planning
-- Agent roster with live status (Thinking / Writing / Reviewing / Idle / Blocked / Speaking)
-- Kanban story board: Backlog → Ready → In Progress → Review → Done
-- Timestamped live activity feed grounded in your product brief
+- **Claude Opus 5.5** for chat + story JSON (personality prompts preserved)
+- Stages gated by completed LLM work: Discovery → Architecture → Story breakdown → Planning → Impl. kickoff → QA planning
+- Agent roster with live status + shimmer while waiting on Claude
+- Kanban: Backlog → Ready → In Progress → Review → Done
 - Responsive layout for phone, tablet, and web
 
 ## Requirements

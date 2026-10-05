@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { UserStory, StoryStatus } from '../types';
 import { colors, radii, spacing, typography } from '../theme';
 import { StoryCard } from './StoryCard';
+import { GlassPanel } from '../ui/GlassPanel';
 
 const COLUMNS: { id: StoryStatus; label: string; tint: string }[] = [
   { id: 'backlog', label: 'Backlog', tint: '#6E7F9F' },
@@ -34,18 +36,20 @@ export function StoryBoard({ stories }: Props) {
   }, [stories]);
 
   return (
-    <View style={styles.wrap}>
+    <GlassPanel style={styles.wrap} padded>
       <View style={styles.header}>
         <Text style={styles.eyebrow}>STORY BOARD</Text>
-        <Text style={styles.count}>{stories.length} stories</Text>
+        <View style={styles.countPill}>
+          <Text style={styles.count}>{stories.length} stories</Text>
+        </View>
       </View>
       {stories.length === 0 ? (
-        <View style={styles.empty}>
+        <Animated.View entering={FadeIn} style={styles.empty}>
           <Text style={styles.emptyTitle}>Stories forming…</Text>
           <Text style={styles.emptyBody}>
-            The team is still in discovery. Cards will appear as breakdown starts.
+            The team is still in discovery. Cards appear the moment Claude returns the backlog.
           </Text>
-        </View>
+        </Animated.View>
       ) : (
         <ScrollView
           horizontal
@@ -53,38 +57,44 @@ export function StoryBoard({ stories }: Props) {
           contentContainerStyle={styles.row}
         >
           {COLUMNS.map((col) => (
-            <View key={col.id} style={[styles.column, { width: colWidth }]}>
+            <Animated.View
+              key={col.id}
+              layout={LinearTransition.springify().damping(18)}
+              style={[
+                styles.column,
+                {
+                  width: colWidth,
+                  borderColor: `${col.tint}28`,
+                },
+              ]}
+            >
               <View style={styles.colHeader}>
                 <View style={[styles.dot, { backgroundColor: col.tint }]} />
                 <Text style={styles.colLabel}>{col.label}</Text>
-                <View style={styles.colCount}>
-                  <Text style={styles.colCountText}>{grouped[col.id].length}</Text>
+                <View style={[styles.colCount, { backgroundColor: `${col.tint}18` }]}>
+                  <Text style={[styles.colCountText, { color: col.tint }]}>
+                    {grouped[col.id].length}
+                  </Text>
                 </View>
               </View>
-              {grouped[col.id].map((story) => (
-                <StoryCard key={story.id} story={story} />
+              {grouped[col.id].map((story, i) => (
+                <StoryCard key={`${story.id}-${story.status}`} story={story} index={i} />
               ))}
               {grouped[col.id].length === 0 ? (
                 <View style={styles.colEmpty}>
-                  <Text style={styles.colEmptyText}>—</Text>
+                  <Text style={styles.colEmptyText}>Drop zone</Text>
                 </View>
               ) : null}
-            </View>
+            </Animated.View>
           ))}
         </ScrollView>
       )}
-    </View>
+    </GlassPanel>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    padding: spacing.lg,
-  },
+  wrap: {},
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -95,21 +105,30 @@ const styles = StyleSheet.create({
     ...typography.section,
     color: colors.textMuted,
   },
+  countPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.borderGlow,
+  },
   count: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: colors.accent,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   row: {
     gap: spacing.md,
     paddingBottom: 4,
   },
   column: {
-    backgroundColor: colors.bg,
+    backgroundColor: 'rgba(3, 6, 15, 0.55)',
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
     padding: spacing.sm,
-    minHeight: 160,
+    minHeight: 180,
   },
   colHeader: {
     flexDirection: 'row',
@@ -126,28 +145,34 @@ const styles = StyleSheet.create({
   },
   colLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.textSecondary,
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
     flex: 1,
+    textTransform: 'uppercase',
   },
   colCount: {
-    backgroundColor: colors.surfaceHover,
     borderRadius: radii.pill,
     paddingHorizontal: 7,
     paddingVertical: 1,
   },
   colCountText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: colors.textMuted,
+    fontWeight: '800',
   },
   colEmpty: {
-    paddingVertical: 24,
+    paddingVertical: 28,
     alignItems: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.borderSubtle,
+    borderRadius: radii.md,
   },
   colEmptyText: {
     color: colors.textDim,
+    fontSize: 11,
+    letterSpacing: 0.6,
+    fontWeight: '600',
   },
   empty: {
     paddingVertical: 28,

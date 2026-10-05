@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TEAM } from '../data/agents';
 import { AgentCard } from '../components/AgentCard';
@@ -17,6 +16,10 @@ import { StoryBoard } from '../components/StoryBoard';
 import { SimulationEngine } from '../simulation/engine';
 import { ProductBrief, SimulationState } from '../types';
 import { colors, radii, spacing, typography } from '../theme';
+import { AmbientBackground } from '../ui/AmbientBackground';
+import { GlassPanel } from '../ui/GlassPanel';
+import { PressableScale } from '../ui/PressableScale';
+import { PulseDot } from '../components/PulseDot';
 
 interface Props {
   brief: ProductBrief;
@@ -45,8 +48,12 @@ export function DashboardScreen({ brief, apiKey, onReset }: Props) {
     };
   }, [engine]);
 
+  const activeCount = TEAM.filter(
+    (a) => state.agents[a.id]?.status !== 'Idle',
+  ).length;
+
   return (
-    <LinearGradient colors={['#060912', '#08101C', '#0A1220']} style={styles.flex}>
+    <AmbientBackground intensity="ops">
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -57,41 +64,57 @@ export function DashboardScreen({ brief, apiKey, onReset }: Props) {
           },
         ]}
       >
-        <View style={styles.topBar}>
-          <View>
+        <Animated.View entering={FadeInDown.springify().damping(16)} style={styles.topBar}>
+          <View style={styles.brandBlock}>
             <Text style={styles.brand}>AGENT TEAM BOARD</Text>
-            <Text style={styles.brandSub}>
-              {state.running ? 'Live simulation' : 'Simulation complete'}
-              {' · '}
-              {live ? 'Claude Opus 5.5' : 'Scripted fallback'}
-            </Text>
+            <View style={styles.brandMeta}>
+              <PulseDot
+                color={state.running ? colors.success : colors.textMuted}
+                size={6}
+                active={state.running}
+              />
+              <Text style={styles.brandSub}>
+                {state.running ? 'Live · parallel streams' : 'Session complete'}
+                {' · '}
+                {live ? 'Claude Opus 5.5' : 'Scripted fallback'}
+              </Text>
+            </View>
           </View>
-          <Pressable onPress={onReset} style={styles.resetBtn}>
+          <PressableScale onPress={onReset} style={styles.resetBtn}>
             <Text style={styles.resetText}>New brief</Text>
-          </Pressable>
-        </View>
+          </PressableScale>
+        </Animated.View>
 
-        <StageProgress
-          stage={state.stage}
-          stageIndex={state.stageIndex}
-          progress={state.progress}
-          productName={brief.name}
-        />
+        <Animated.View entering={FadeInDown.delay(60).springify().damping(16)}>
+          <StageProgress
+            stage={state.stage}
+            stageIndex={state.stageIndex}
+            progress={state.progress}
+            productName={brief.name}
+          />
+        </Animated.View>
 
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>TEAM ROSTER</Text>
-          <Text style={styles.sectionHint}>
-            {TEAM.filter((a) => state.agents[a.id]?.status !== 'Idle').length} active
-          </Text>
+          <View style={styles.activePill}>
+            <Text style={styles.sectionHint}>{activeCount} active</Text>
+          </View>
         </View>
 
         <View style={[styles.roster, isWide && styles.rosterWide]}>
-          {TEAM.map((agent) => (
+          {TEAM.map((agent, index) => (
             <View
               key={agent.id}
-              style={[styles.rosterItem, isWide ? styles.rosterItemWide : styles.rosterItemNarrow]}
+              style={[
+                styles.rosterItem,
+                isWide ? styles.rosterItemWide : styles.rosterItemNarrow,
+              ]}
             >
-              <AgentCard agent={agent} state={state.agents[agent.id]} />
+              <AgentCard
+                agent={agent}
+                state={state.agents[agent.id]}
+                index={index}
+              />
             </View>
           ))}
         </View>
@@ -105,7 +128,7 @@ export function DashboardScreen({ brief, apiKey, onReset }: Props) {
           </View>
         </View>
 
-        <View style={styles.briefCard}>
+        <GlassPanel style={styles.briefCard} accent={colors.violet}>
           <Text style={styles.sectionTitle}>PRODUCT BRIEF</Text>
           <Text style={styles.briefName}>{brief.name}</Text>
           <Text style={styles.briefBody}>{brief.description}</Text>
@@ -121,14 +144,13 @@ export function DashboardScreen({ brief, apiKey, onReset }: Props) {
               {brief.constraints}
             </Text>
           ) : null}
-        </View>
+        </GlassPanel>
       </ScrollView>
-    </LinearGradient>
+    </AmbientBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
   content: {
     maxWidth: 1200,
     width: '100%',
@@ -140,27 +162,39 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  brandBlock: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 12,
+  },
   brand: {
     ...typography.section,
     color: colors.accent,
   },
+  brandMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+    marginLeft: -4,
+  },
   brandSub: {
     ...typography.caption,
     color: colors.textMuted,
-    marginTop: 2,
   },
   resetBtn: {
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(14, 22, 40, 0.85)',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: radii.pill,
   },
   resetText: {
     color: colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 13,
+    letterSpacing: 0.2,
   },
   sectionHead: {
     flexDirection: 'row',
@@ -172,9 +206,19 @@ const styles = StyleSheet.create({
     ...typography.section,
     color: colors.textMuted,
   },
+  activePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.borderGlow,
+  },
   sectionHint: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: colors.accent,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
   roster: {
     flexDirection: 'row',
@@ -201,11 +245,6 @@ const styles = StyleSheet.create({
   splitMain: {},
   splitSide: {},
   briefCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
-    padding: spacing.lg,
     gap: 8,
   },
   briefName: {

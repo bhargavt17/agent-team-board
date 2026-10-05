@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,11 +9,24 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  Easing,
+  FadeInDown,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TEAM } from '../data/agents';
 import { loadApiKey, saveApiKey, envApiKey } from '../ai/apiKey';
 import { ProductBrief } from '../types';
-import { colors, radii, roleColors, spacing, typography } from '../theme';
+import { colors, radii, roleColors, shadows, spacing, typography } from '../theme';
+import { AmbientBackground } from '../ui/AmbientBackground';
+import { PressableScale } from '../ui/PressableScale';
+import { FadeIn } from '../ui/FadeIn';
+import { PulseDot } from '../components/PulseDot';
 
 export interface LaunchPayload {
   brief: ProductBrief;
@@ -43,6 +55,23 @@ export function LaunchScreen({ onStart }: Props) {
   const [constraints, setConstraints] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [keyFromEnv, setKeyFromEnv] = useState(false);
+
+  const heroGlow = useSharedValue(0.35);
+
+  useEffect(() => {
+    heroGlow.value = withRepeat(
+      withSequence(
+        withTiming(0.7, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0.35, { duration: 2400, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    );
+  }, [heroGlow]);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: heroGlow.value,
+  }));
 
   useEffect(() => {
     let cancelled = false;
@@ -91,7 +120,7 @@ export function LaunchScreen({ onStart }: Props) {
   };
 
   return (
-    <LinearGradient colors={['#060912', '#0A1224', '#0B1320']} style={styles.flex}>
+    <AmbientBackground intensity="launch">
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -99,52 +128,80 @@ export function LaunchScreen({ onStart }: Props) {
         <ScrollView
           contentContainerStyle={[
             styles.content,
-            { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 32 },
+            { paddingTop: insets.top + 28, paddingBottom: insets.bottom + 36 },
           ]}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.heroBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.heroBadgeText}>AGENT OPS ROOM · CLAUDE</Text>
+          <FadeIn from="scale" delay={40}>
+            <View style={styles.heroBadge}>
+              <PulseDot color={colors.success} size={6} active />
+              <Text style={styles.heroBadgeText}>AGENT OPS ROOM · CLAUDE OPUS</Text>
+            </View>
+          </FadeIn>
+
+          <View style={styles.heroBlock}>
+            <Animated.View style={[styles.heroOrb, glowStyle]} pointerEvents="none" />
+            <Animated.Text
+              entering={FadeInDown.delay(120).springify().damping(14)}
+              style={styles.hero}
+            >
+              Brief the team.{'\n'}Watch them build.
+            </Animated.Text>
+            <Animated.Text
+              entering={FadeInDown.delay(220).springify().damping(16)}
+              style={styles.sub}
+            >
+              Drop your product details. Six specialists stream live on Claude Opus — parallel
+              discovery, architecture, and story breakdown as tokens arrive.
+            </Animated.Text>
           </View>
 
-          <Text style={styles.hero}>Brief the team.{'\n'}Watch them build.</Text>
-          <Text style={styles.sub}>
-            Drop your product details. Six specialists — director, EM, architect, backend,
-            frontend, QA — powered by Anthropic Claude will discover, plan, and story-break
-            it live.
-          </Text>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.teamStrip}
-          >
-            {TEAM.map((a) => (
-              <View
-                key={a.id}
-                style={[styles.chip, { borderColor: `${roleColors[a.role]}44` }]}
-              >
-                <View
-                  style={[styles.chipAvatar, { backgroundColor: `${roleColors[a.role]}22` }]}
+          <Animated.View entering={FadeInDown.delay(280).springify().damping(16)}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.teamStrip}
+            >
+              {TEAM.map((a, i) => (
+                <Animated.View
+                  key={a.id}
+                  entering={FadeInDown.delay(320 + i * 50).springify().damping(16)}
+                  style={[styles.chip, { borderColor: `${roleColors[a.role]}44` }]}
                 >
-                  <Text style={{ color: roleColors[a.role], fontWeight: '800', fontSize: 10 }}>
-                    {a.initials}
-                  </Text>
-                </View>
-                <View>
-                  <Text style={styles.chipName}>{a.name.split(' ')[0]}</Text>
-                  <Text style={styles.chipRole}>{a.tagline}</Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
+                  <View
+                    style={[
+                      styles.chipAvatar,
+                      { backgroundColor: `${roleColors[a.role]}22` },
+                    ]}
+                  >
+                    <Text
+                      style={{ color: roleColors[a.role], fontWeight: '800', fontSize: 10 }}
+                    >
+                      {a.initials}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.chipName}>{a.name.split(' ')[0]}</Text>
+                    <Text style={styles.chipRole}>{a.tagline}</Text>
+                  </View>
+                </Animated.View>
+              ))}
+            </ScrollView>
+          </Animated.View>
 
-          <View style={styles.form}>
+          <Animated.View
+            entering={FadeInDown.delay(420).springify().damping(15)}
+            style={styles.form}
+          >
+            <LinearGradient
+              colors={['rgba(255,255,255,0.05)', 'transparent']}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
             <View style={styles.providerRow}>
               <Text style={styles.providerLabel}>AI provider</Text>
               <View style={styles.providerPill}>
-                <Text style={styles.providerPillText}>Claude Opus 5.5 (Anthropic)</Text>
+                <Text style={styles.providerPillText}>Claude Opus 5.5 · streaming</Text>
               </View>
             </View>
 
@@ -171,11 +228,11 @@ export function LaunchScreen({ onStart }: Props) {
               <Text style={styles.hint}>
                 {hasKey
                   ? 'Key will be stored in AsyncStorage (never committed).'
-                  : 'Optional — without a key, agents use scripted fallback lines.'}
+                  : 'Optional — without a key, agents use a typed scripted fallback.'}
               </Text>
             )}
             {keyFromEnv ? (
-              <Pressable
+              <PressableScale
                 onPress={() => {
                   setKeyFromEnv(false);
                   setApiKey('');
@@ -183,7 +240,7 @@ export function LaunchScreen({ onStart }: Props) {
                 style={styles.exampleBtn}
               >
                 <Text style={styles.exampleText}>Use a different key</Text>
-              </Pressable>
+              </PressableScale>
             ) : null}
 
             <Field
@@ -214,34 +271,31 @@ export function LaunchScreen({ onStart }: Props) {
               multiline
             />
 
-            <Pressable onPress={fillExample} style={styles.exampleBtn}>
+            <PressableScale onPress={fillExample} style={styles.exampleBtn}>
               <Text style={styles.exampleText}>Use PulseHire example</Text>
-            </Pressable>
+            </PressableScale>
 
-            <Pressable
+            <PressableScale
               disabled={!canStart}
               onPress={handleStart}
-              style={({ pressed }) => [
-                styles.cta,
-                !canStart && styles.ctaDisabled,
-                pressed && canStart && styles.ctaPressed,
-              ]}
+              scaleTo={0.96}
+              style={[styles.cta, !canStart && styles.ctaDisabled, canStart && shadows.glow(colors.accent)]}
             >
               <LinearGradient
-                colors={canStart ? ['#5B8CFF', '#7B6CFF'] : ['#243352', '#243352']}
+                colors={canStart ? ['#6B9BFF', '#8B7CFF', '#22D3EE'] : ['#243352', '#243352']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.ctaGrad}
               >
                 <Text style={[styles.ctaText, !canStart && { color: colors.textDim }]}>
-                  {hasKey || keyFromEnv ? 'Launch with Claude' : 'Launch (scripted fallback)'}
+                  {hasKey || keyFromEnv ? 'Launch live ops room' : 'Launch (scripted fallback)'}
                 </Text>
               </LinearGradient>
-            </Pressable>
-          </View>
+            </PressableScale>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </AmbientBackground>
   );
 }
 
@@ -300,36 +354,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: colors.accentSoft,
-    borderColor: `${colors.accent}44`,
+    borderColor: colors.borderGlow,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: radii.pill,
     marginBottom: spacing.lg,
   },
-  liveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: colors.success,
-  },
   heroBadgeText: {
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1.4,
+    letterSpacing: 1.6,
     color: colors.accent,
   },
+  heroBlock: {
+    position: 'relative',
+    marginBottom: spacing.xl,
+  },
+  heroOrb: {
+    position: 'absolute',
+    top: -40,
+    left: -20,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: 'rgba(107, 155, 255, 0.25)',
+  },
   hero: {
-    ...typography.hero,
+    ...typography.display,
     color: colors.text,
-    lineHeight: 34,
+    lineHeight: 40,
     marginBottom: spacing.md,
   },
   sub: {
     ...typography.body,
     color: colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: spacing.xl,
+    lineHeight: 23,
   },
   teamStrip: {
     gap: spacing.sm,
@@ -339,7 +399,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(14, 22, 40, 0.85)',
     borderWidth: 1,
     borderRadius: radii.lg,
     paddingVertical: 8,
@@ -362,12 +422,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   form: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
+    backgroundColor: 'rgba(14, 22, 40, 0.82)',
+    borderRadius: radii.xxl,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
     padding: spacing.lg,
     gap: spacing.md,
+    overflow: 'hidden',
+    ...shadows.card,
   },
   providerRow: {
     flexDirection: 'row',
@@ -377,9 +439,9 @@ const styles = StyleSheet.create({
   providerLabel: {
     ...typography.caption,
     color: colors.textMuted,
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
-    fontWeight: '700',
+    fontWeight: '800',
   },
   providerPill: {
     backgroundColor: 'rgba(217, 119, 87, 0.15)',
@@ -393,6 +455,7 @@ const styles = StyleSheet.create({
     color: '#E8A87C',
     fontWeight: '700',
     fontSize: 12,
+    letterSpacing: 0.2,
   },
   hint: {
     ...typography.caption,
@@ -404,12 +467,12 @@ const styles = StyleSheet.create({
   label: {
     ...typography.caption,
     color: colors.textMuted,
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
-    fontWeight: '700',
+    fontWeight: '800',
   },
   input: {
-    backgroundColor: colors.bg,
+    backgroundColor: 'rgba(3, 6, 15, 0.7)',
     borderWidth: 1,
     borderColor: colors.borderSubtle,
     borderRadius: radii.md,
@@ -431,24 +494,23 @@ const styles = StyleSheet.create({
   },
   exampleText: {
     color: colors.accent,
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 13,
   },
   cta: {
     marginTop: spacing.sm,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     overflow: 'hidden',
   },
-  ctaDisabled: { opacity: 0.7 },
-  ctaPressed: { opacity: 0.9 },
+  ctaDisabled: { opacity: 0.65 },
   ctaGrad: {
-    paddingVertical: 15,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   ctaText: {
     color: '#fff',
     fontWeight: '800',
     fontSize: 16,
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
 });

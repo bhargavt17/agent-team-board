@@ -1,30 +1,37 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { getAgent } from '../data/agents';
 import { UserStory } from '../types';
-import { colors, radii, roleColors, spacing, typography } from '../theme';
+import { colors, radii, roleColors, shadows, spacing, typography } from '../theme';
 
 interface Props {
   story: UserStory;
+  index?: number;
 }
 
-export function StoryCard({ story }: Props) {
+export function StoryCard({ story, index = 0 }: Props) {
   const agent = getAgent(story.assigneeId);
   const accent = roleColors[agent.role] ?? colors.accent;
 
   return (
-    <View style={styles.card}>
+    <Animated.View
+      layout={LinearTransition.springify().damping(18)}
+      entering={FadeInDown.delay(index * 40).springify().damping(16)}
+      style={[styles.card, { borderColor: `${accent}28` }]}
+    >
+      <View style={[styles.glowEdge, { backgroundColor: accent }]} />
       <View style={styles.top}>
         <Text style={styles.key}>{story.key}</Text>
-        <View style={styles.points}>
-          <Text style={styles.pointsText}>{story.points} pts</Text>
+        <View style={[styles.points, { backgroundColor: `${accent}18`, borderColor: `${accent}33` }]}>
+          <Text style={[styles.pointsText, { color: accent }]}>{story.points} pts</Text>
         </View>
       </View>
       <Text style={styles.title} numberOfLines={3}>
         {story.title}
       </Text>
       <View style={styles.footer}>
-        <View style={[styles.assignee, { backgroundColor: `${accent}22` }]}>
+        <View style={[styles.assignee, { backgroundColor: `${accent}22`, borderColor: `${accent}44` }]}>
           <Text style={[styles.assigneeText, { color: accent }]}>{agent.initials}</Text>
         </View>
         <Text style={styles.assigneeName} numberOfLines={1}>
@@ -36,18 +43,27 @@ export function StoryCard({ story }: Props) {
           AC · {story.acceptanceCriteria[0]}
         </Text>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.bgElevated,
-    borderRadius: radii.md,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    overflow: 'hidden',
+    ...shadows.soft,
+  },
+  glowEdge: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 2,
+    opacity: 0.7,
   },
   top: {
     flexDirection: 'row',
@@ -58,24 +74,26 @@ const styles = StyleSheet.create({
   key: {
     ...typography.mono,
     color: colors.textMuted,
+    letterSpacing: 0.6,
   },
   points: {
-    backgroundColor: colors.accentSoft,
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radii.pill,
+    borderWidth: 1,
   },
   pointsText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: colors.accent,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   title: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.text,
     lineHeight: 18,
     marginBottom: 8,
+    letterSpacing: -0.1,
   },
   footer: {
     flexDirection: 'row',
@@ -87,6 +105,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 7,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

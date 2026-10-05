@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { STAGES } from '../data/agents';
 import { StageId } from '../types';
-import { colors, radii, spacing, stageColors, typography } from '../theme';
+import { colors, radii, shadows, spacing, stageColors, typography } from '../theme';
+import { GlassPanel } from '../ui/GlassPanel';
 
 interface Props {
   stage: StageId;
@@ -14,9 +22,21 @@ interface Props {
 export function StageProgress({ stage, stageIndex, progress, productName }: Props) {
   const label =
     stage === 'complete' ? 'Session complete' : STAGES[stageIndex]?.label ?? 'In progress';
+  const width = useSharedValue(0);
+
+  useEffect(() => {
+    width.value = withTiming(Math.min(100, Math.max(0, progress)), {
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [progress, width]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${width.value}%`,
+  }));
 
   return (
-    <View style={styles.wrap}>
+    <GlassPanel style={styles.wrap} accent={colors.accent} glow padded={false}>
       <View style={styles.top}>
         <View style={{ flex: 1 }}>
           <Text style={styles.eyebrow}>MISSION CONTROL</Text>
@@ -31,7 +51,14 @@ export function StageProgress({ stage, stageIndex, progress, productName }: Prop
       </View>
 
       <View style={styles.track}>
-        <View style={[styles.fill, { width: `${Math.min(100, Math.max(0, progress))}%` }]} />
+        <Animated.View style={[styles.fillHost, fillStyle]}>
+          <LinearGradient
+            colors={[colors.accentHot, colors.accent, colors.cyan]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.fill}
+          />
+        </Animated.View>
       </View>
 
       <View style={styles.stages}>
@@ -40,15 +67,24 @@ export function StageProgress({ stage, stageIndex, progress, productName }: Prop
           const active = i === stageIndex && stage !== 'complete';
           const tint = stageColors[i];
           return (
-            <View key={s.id} style={styles.stageItem}>
+            <View
+              key={s.id}
+              style={[
+                styles.stageItem,
+                active && {
+                  borderColor: `${tint}66`,
+                  backgroundColor: `${tint}14`,
+                  ...shadows.glow(tint),
+                },
+                done && !active && { borderColor: `${tint}33` },
+              ]}
+            >
               <View
                 style={[
                   styles.stageDot,
                   {
                     backgroundColor: done || active ? tint : colors.borderSubtle,
-                    shadowColor: active ? tint : 'transparent',
                   },
-                  active && styles.stageDotActive,
                 ]}
               />
               <Text
@@ -64,16 +100,12 @@ export function StageProgress({ stage, stageIndex, progress, productName }: Prop
           );
         })}
       </View>
-    </View>
+    </GlassPanel>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: colors.surfaceBorder,
     padding: spacing.lg,
   },
   top: {
@@ -84,8 +116,8 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     ...typography.section,
-    color: colors.textMuted,
-    marginBottom: 4,
+    color: colors.accent,
+    marginBottom: 6,
   },
   title: {
     ...typography.title,
@@ -95,27 +127,32 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   pct: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '800',
-    color: colors.accent,
-    letterSpacing: -0.5,
+    color: colors.text,
+    letterSpacing: -0.8,
   },
   pctLabel: {
     ...typography.caption,
     color: colors.textMuted,
     marginTop: 2,
+    letterSpacing: 0.3,
   },
   track: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.bg,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     overflow: 'hidden',
     marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
+  fillHost: {
+    height: '100%',
   },
   fill: {
     height: '100%',
-    borderRadius: 3,
-    backgroundColor: colors.accent,
+    borderRadius: 4,
   },
   stages: {
     flexDirection: 'row',
@@ -126,8 +163,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     backgroundColor: colors.bgElevated,
     borderRadius: radii.pill,
     borderWidth: 1,
@@ -138,14 +175,9 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
   },
-  stageDotActive: {
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 3,
-  },
   stageLabel: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });
