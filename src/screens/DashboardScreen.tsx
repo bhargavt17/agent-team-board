@@ -20,15 +20,20 @@ import { colors, radii, spacing, typography } from '../theme';
 
 interface Props {
   brief: ProductBrief;
+  apiKey: string;
   onReset: () => void;
 }
 
-export function DashboardScreen({ brief, onReset }: Props) {
+export function DashboardScreen({ brief, apiKey, onReset }: Props) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const isWide = width >= 960;
+  const live = apiKey.trim().length > 0;
 
-  const engine = useMemo(() => new SimulationEngine(brief), [brief]);
+  const engine = useMemo(
+    () => new SimulationEngine({ brief, apiKey }),
+    [brief, apiKey],
+  );
   const [state, setState] = useState<SimulationState>(engine.getState());
 
   useEffect(() => {
@@ -57,6 +62,8 @@ export function DashboardScreen({ brief, onReset }: Props) {
             <Text style={styles.brand}>AGENT TEAM BOARD</Text>
             <Text style={styles.brandSub}>
               {state.running ? 'Live simulation' : 'Simulation complete'}
+              {' · '}
+              {live ? 'Claude' : 'Scripted fallback'}
             </Text>
           </View>
           <Pressable onPress={onReset} style={styles.resetBtn}>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,11 +12,17 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TEAM } from '../data/agents';
+import { loadApiKey, saveApiKey, envApiKey } from '../ai/apiKey';
 import { ProductBrief } from '../types';
 import { colors, radii, roleColors, spacing, typography } from '../theme';
 
+export interface LaunchPayload {
+  brief: ProductBrief;
+  apiKey: string;
+}
+
 interface Props {
-  onStart: (brief: ProductBrief) => void;
+  onStart: (payload: LaunchPayload) => void;
 }
 
 const EXAMPLES: ProductBrief[] = [
@@ -25,7 +31,7 @@ const EXAMPLES: ProductBrief[] = [
     description:
       'AI-assisted hiring ops board that tracks applications, interviews, and recruiter follow-ups in real time.',
     goals: 'Cut time-to-schedule, surface stalled candidates, delight recruiters on mobile',
-    constraints: 'Must work offline-first on phones; no LLM calls in the critical path for v1',
+    constraints: 'Must work offline-first on phones; keep v1 lean',
   },
 ];
 
@@ -35,8 +41,30 @@ export function LaunchScreen({ onStart }: Props) {
   const [description, setDescription] = useState('');
   const [goals, setGoals] = useState('');
   const [constraints, setConstraints] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [keyFromEnv, setKeyFromEnv] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const env = envApiKey();
+      if (env) {
+        if (!cancelled) {
+          setApiKey(env);
+          setKeyFromEnv(true);
+        }
+        return;
+      }
+      const stored = await loadApiKey();
+      if (!cancelled && stored) setApiKey(stored);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const canStart = name.trim().length > 1 && description.trim().length > 8;
+  const hasKey = apiKey.trim().length > 8;
 
   const fillExample = () => {
     const ex = EXAMPLES[0];
@@ -44,6 +72,22 @@ export function LaunchScreen({ onStart }: Props) {
     setDescription(ex.description);
     setGoals(ex.goals);
     setConstraints(ex.constraints);
+  };
+
+  const handleStart = async () => {
+    const key = apiKey.trim();
+    if (key && !keyFromEnv) {
+      await saveApiKey(key);
+    }
+    onStart({
+      brief: {
+        name: name.trim(),
+        description: description.trim(),
+        goals: goals.trim(),
+        constraints: constraints.trim(),
+      },
+      apiKey: key,
+    });
   };
 
   return (
@@ -61,13 +105,14 @@ export function LaunchScreen({ onStart }: Props) {
         >
           <View style={styles.heroBadge}>
             <View style={styles.liveDot} />
-            <Text style={styles.heroBadgeText}>AGENT OPS ROOM</Text>
+            <Text style={styles.heroBadgeText}>AGENT OPS ROOM · CLAUDE</Text>
           </View>
 
           <Text style={styles.hero}>Brief the team.{'\n'}Watch them build.</Text>
           <Text style={styles.sub}>
             Drop your product details. Six specialists — director, EM, architect, backend,
-            frontend, QA — will discover, plan, and story-break it live.
+            frontend, QA — powered by Anthropic Claude will discover, plan, and story-break
+            it live.
           </Text>
 
           <ScrollView
@@ -96,6 +141,51 @@ export function LaunchScreen({ onStart }: Props) {
           </ScrollView>
 
           <View style={styles.form}>
+            <View style={styles.providerRow}>
+              <Text style={styles.providerLabel}>AI provider</Text>
+              <View style={styles.providerPill}>
+                <Text style={styles.providerPillText}>Claude (Anthropic)</Text>
+              </View>
+            </View>
+
+            <Field
+              label="Anthropic API key"
+              placeholder={
+                keyFromEnv
+                  ? 'Using EXPO_PUBLIC_ANTHROPIC_API_KEY from env'
+                  : 'sk-ant-… (saved on this device)'
+              }
+              value={keyFromEnv ? '' : apiKey}
+              onChangeText={(t) => {
+                setKeyFromEnv(false);
+                setApiKey(t);
+              }}
+              secure
+              editable={!keyFromEnv}
+            />
+            {keyFromEnv ? (
+              <Text style={styles.hint}>
+                Key loaded from environment. Paste a different key to override for this device.
+              </Text>
+            ) : (
+              <Text style={styles.hint}>
+                {hasKey
+                  ? 'Key will be stored in AsyncStorage (never committed).'
+                  : 'Optional — without a key, agents use scripted fallback lines.'}
+              </Text>
+            )}
+            {keyFromEnv ? (
+              <Pressable
+                onPress={() => {
+                  setKeyFromEnv(false);
+                  setApiKey('');
+                }}
+                style={styles.exampleBtn}
+              >
+                <Text style={styles.exampleText}>Use a different key</Text>
+              </Pressable>
+            ) : null}
+
             <Field
               label="Product name"
               placeholder="e.g. PulseHire"
@@ -130,14 +220,7 @@ export function LaunchScreen({ onStart }: Props) {
 
             <Pressable
               disabled={!canStart}
-              onPress={() =>
-                onStart({
-                  name: name.trim(),
-                  description: description.trim(),
-                  goals: goals.trim(),
-                  constraints: constraints.trim(),
-                })
-              }
+              onPress={handleStart}
               style={({ pressed }) => [
                 styles.cta,
                 !canStart && styles.ctaDisabled,
@@ -151,7 +234,7 @@ export function LaunchScreen({ onStart }: Props) {
                 style={styles.ctaGrad}
               >
                 <Text style={[styles.ctaText, !canStart && { color: colors.textDim }]}>
-                  Launch simulation
+                  {hasKey || keyFromEnv ? 'Launch with Claude' : 'Launch (scripted fallback)'}
                 </Text>
               </LinearGradient>
             </Pressable>
@@ -168,12 +251,16 @@ function Field({
   value,
   onChangeText,
   multiline,
+  secure,
+  editable = true,
 }: {
   label: string;
   placeholder: string;
   value: string;
   onChangeText: (t: string) => void;
   multiline?: boolean;
+  secure?: boolean;
+  editable?: boolean;
 }) {
   return (
     <View style={styles.field}>
@@ -184,8 +271,16 @@ function Field({
         placeholder={placeholder}
         placeholderTextColor={colors.textDim}
         multiline={multiline}
+        secureTextEntry={secure}
+        autoCapitalize="none"
+        autoCorrect={false}
+        editable={editable}
         textAlignVertical={multiline ? 'top' : 'center'}
-        style={[styles.input, multiline && styles.inputMulti]}
+        style={[
+          styles.input,
+          multiline && styles.inputMulti,
+          !editable && styles.inputDisabled,
+        ]}
       />
     </View>
   );
@@ -274,6 +369,37 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.md,
   },
+  providerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  providerLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontWeight: '700',
+  },
+  providerPill: {
+    backgroundColor: 'rgba(217, 119, 87, 0.15)',
+    borderColor: 'rgba(217, 119, 87, 0.45)',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radii.pill,
+  },
+  providerPillText: {
+    color: '#E8A87C',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  hint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: -4,
+    lineHeight: 16,
+  },
   field: { gap: 6 },
   label: {
     ...typography.caption,
@@ -291,6 +417,9 @@ const styles = StyleSheet.create({
     paddingVertical: Platform.OS === 'web' ? 12 : 11,
     color: colors.text,
     fontSize: 15,
+  },
+  inputDisabled: {
+    opacity: 0.7,
   },
   inputMulti: {
     minHeight: 88,

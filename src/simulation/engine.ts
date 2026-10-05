@@ -1,25 +1,43 @@
-import { TEAM, STAGES } from '../data/agents';
+import { TEAM, STAGES, getAgent } from '../data/agents';
 import {
   ActivityItem,
   AgentState,
+  AgentStatus,
   ProductBrief,
   SimulationState,
   StageId,
   StoryStatus,
   UserStory,
 } from '../types';
+import { chatClaude } from '../ai/anthropicClient';
+import { generateStoriesWithClaude } from '../ai/generateStoriesWithClaude';
+import { beatUserPrompt, systemPromptForAgent } from '../ai/prompts';
 import { generateStories } from './storyGenerator';
 
 type Listener = (state: SimulationState) => void;
 
+interface SpeakerBeat {
+  agentId: string;
+  hint: string;
+  fallbackMessage: string;
+  kind?: ActivityItem['kind'];
+  /** Status while waiting on Claude */
+  thinkingStatus?: AgentStatus;
+  /** Status once message lands */
+  speakingStatus?: AgentStatus;
+  fallbackTask: string;
+}
+
 interface ScriptBeat {
   delayMs: number;
   stage?: StageId;
-  agents?: Partial<Record<string, { status: AgentState['status']; task: string }>>;
-  activity?: { agentId: string; message: string; kind?: ActivityItem['kind'] }[];
-  stories?: { id: string; status?: StoryStatus; append?: boolean }[];
+  /** Static agent patches applied after AI lines (or immediately if no speakers) */
+  agents?: Partial<Record<string, { status: AgentStatus; task: string }>>;
+  speakers?: SpeakerBeat[];
+  stories?: { id: string; status?: StoryStatus }[];
   spawnStories?: boolean;
   progress?: number;
+  systemActivity?: { message: string; kind?: ActivityItem['kind'] }[];
 }
 
 function idleAgents(): Record<string, AgentState> {
@@ -31,196 +49,238 @@ function idleAgents(): Record<string, AgentState> {
   );
 }
 
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 function buildScript(brief: ProductBrief): ScriptBeat[] {
   const product = brief.name.trim() || 'the product';
   return [
     {
-      delayMs: 600,
+      delayMs: 500,
       stage: 'discovery',
       progress: 4,
-      agents: {
-        aria: { status: 'Speaking', task: `Framing vision for ${product}` },
-        marcus: { status: 'Thinking', task: 'Listening for scope signals' },
-      },
-      activity: [
+      speakers: [
         {
           agentId: 'aria',
-          message: `Kickoff: ${product}. Let's clarify the outcome before we touch architecture.`,
-          kind: 'chat',
+          hint: 'Kick off discovery: frame the outcome and ask the team to clarify before architecture.',
+          fallbackMessage: `Kickoff: ${product}. Let's clarify the outcome before we touch architecture.`,
+          fallbackTask: `Framing vision for ${product}`,
+          thinkingStatus: 'Thinking',
+          speakingStatus: 'Speaking',
         },
       ],
+      agents: {
+        marcus: { status: 'Thinking', task: 'Listening for scope signals' },
+      },
     },
     {
-      delayMs: 2200,
-      progress: 10,
-      agents: {
-        aria: { status: 'Writing', task: 'Capturing goals & non-goals' },
-        marcus: { status: 'Writing', task: 'Drafting discovery notes' },
-        jordan: { status: 'Thinking', task: 'Spotting testable outcomes' },
-      },
-      activity: [
+      delayMs: 1800,
+      progress: 12,
+      speakers: [
         {
           agentId: 'aria',
-          message: `Goals locked: ${brief.goals.slice(0, 120) || 'deliver a focused MVP'}.`,
-          kind: 'chat',
+          hint: 'Lock goals and non-goals from the brief in one crisp update.',
+          fallbackMessage: `Goals locked: ${brief.goals.slice(0, 120) || 'deliver a focused MVP'}.`,
+          fallbackTask: 'Capturing goals & non-goals',
+          thinkingStatus: 'Writing',
+          speakingStatus: 'Speaking',
         },
         {
           agentId: 'marcus',
-          message: 'I want discovery closed in this session — no zombie tickets.',
-          kind: 'chat',
+          hint: 'Commit to closing discovery this session; no zombie tickets.',
+          fallbackMessage: 'I want discovery closed in this session — no zombie tickets.',
+          fallbackTask: 'Drafting discovery notes',
+          thinkingStatus: 'Writing',
+          speakingStatus: 'Speaking',
         },
       ],
+      agents: {
+        jordan: { status: 'Thinking', task: 'Spotting testable outcomes' },
+      },
     },
     {
-      delayMs: 2800,
+      delayMs: 2000,
       stage: 'architecture',
-      progress: 18,
+      progress: 22,
+      speakers: [
+        {
+          agentId: 'priya',
+          hint: 'Sketch the system shape: modular core, API edge, honor constraints from the brief.',
+          fallbackMessage: `Architecture pass: modular core, clear API edge — ${brief.constraints.slice(0, 90) || 'keep v1 lean'}.`,
+          fallbackTask: `Sketching system for ${product}`,
+          thinkingStatus: 'Thinking',
+          speakingStatus: 'Speaking',
+        },
+      ],
       agents: {
         aria: { status: 'Reviewing', task: 'Reviewing priority stack' },
-        priya: { status: 'Speaking', task: `Sketching system for ${product}` },
         leo: { status: 'Thinking', task: 'Mapping data boundaries' },
         sofia: { status: 'Thinking', task: 'Noting UX constraints' },
         marcus: { status: 'Idle', task: 'Waiting on architecture cut' },
       },
-      activity: [
-        {
-          agentId: 'priya',
-          message: `Architecture pass: modular core, clear API edge, constraints noted — ${brief.constraints.slice(0, 90) || 'keep v1 lean'}.`,
-          kind: 'chat',
-        },
-      ],
     },
     {
-      delayMs: 3200,
-      progress: 28,
-      agents: {
-        priya: { status: 'Writing', task: 'Documenting service boundaries' },
-        leo: { status: 'Writing', task: 'Drafting API contracts' },
-        sofia: { status: 'Reviewing', task: 'Checking flow against shell' },
-      },
-      activity: [
+      delayMs: 2200,
+      progress: 32,
+      speakers: [
         {
           agentId: 'leo',
-          message: 'Propose resource-oriented APIs with a shared error model.',
-          kind: 'chat',
+          hint: 'Propose API shape / contracts for this product.',
+          fallbackMessage: 'Propose resource-oriented APIs with a shared error model.',
+          fallbackTask: 'Drafting API contracts',
+          thinkingStatus: 'Writing',
+          speakingStatus: 'Speaking',
         },
         {
           agentId: 'sofia',
-          message: 'UI shell should stay responsive on phone first — tablet/web as stretch.',
-          kind: 'chat',
+          hint: 'Call out phone-first UI constraints for the shell.',
+          fallbackMessage: 'UI shell should stay responsive on phone first — tablet/web as stretch.',
+          fallbackTask: 'Checking flow against shell',
+          thinkingStatus: 'Reviewing',
+          speakingStatus: 'Speaking',
         },
       ],
+      agents: {
+        priya: { status: 'Writing', task: 'Documenting service boundaries' },
+      },
     },
     {
-      delayMs: 3000,
+      delayMs: 2000,
       stage: 'story_breakdown',
-      progress: 38,
+      progress: 42,
       spawnStories: true,
+      speakers: [
+        {
+          agentId: 'marcus',
+          hint: 'Drive story breakdown: everyone owns clarity, not just tickets.',
+          fallbackMessage: `Breaking ${product} into shippable stories. Everyone owns clarity, not just tickets.`,
+          fallbackTask: 'Driving story breakdown',
+          thinkingStatus: 'Thinking',
+          speakingStatus: 'Speaking',
+        },
+      ],
       agents: {
-        marcus: { status: 'Speaking', task: 'Driving story breakdown' },
         aria: { status: 'Reviewing', task: 'Validating story value' },
         priya: { status: 'Reviewing', task: 'Checking technical fit' },
         leo: { status: 'Writing', task: 'Splitting backend stories' },
         sofia: { status: 'Writing', task: 'Splitting frontend stories' },
         jordan: { status: 'Writing', task: 'Attaching acceptance seeds' },
       },
-      activity: [
-        {
-          agentId: 'marcus',
-          message: `Breaking ${product} into shippable stories. Everyone owns clarity, not just tickets.`,
-          kind: 'chat',
-        },
-        {
-          agentId: 'system',
-          message: 'User stories drafted into the backlog.',
-          kind: 'story',
-        },
+      systemActivity: [
+        { message: 'User stories drafted into the backlog.', kind: 'story' },
       ],
     },
     {
-      delayMs: 2600,
-      progress: 48,
+      delayMs: 1800,
+      progress: 52,
       stories: [
         { id: 'story-1', status: 'ready' },
         { id: 'story-2', status: 'ready' },
         { id: 'story-3', status: 'ready' },
       ],
-      agents: {
-        marcus: { status: 'Writing', task: 'Ordering backlog by risk' },
-        jordan: { status: 'Reviewing', task: 'Hardening acceptance criteria' },
-        leo: { status: 'Reviewing', task: 'Sizing API stories' },
-        sofia: { status: 'Reviewing', task: 'Sizing UI stories' },
-      },
-      activity: [
+      speakers: [
         {
           agentId: 'jordan',
-          message: 'AC tightened on the vision + domain stories — testable verbs only.',
-          kind: 'chat',
+          hint: 'Harden acceptance criteria on the top vision/domain stories — testable verbs only.',
+          fallbackMessage: 'AC tightened on the vision + domain stories — testable verbs only.',
+          fallbackTask: 'Hardening acceptance criteria',
+          thinkingStatus: 'Reviewing',
+          speakingStatus: 'Speaking',
         },
         {
           agentId: 'marcus',
-          message: 'Moving top three into Ready.',
+          hint: 'Move the top three stories into Ready and note ordering by risk.',
+          fallbackMessage: 'Moving top three into Ready.',
+          fallbackTask: 'Ordering backlog by risk',
+          thinkingStatus: 'Writing',
+          speakingStatus: 'Speaking',
           kind: 'status',
         },
       ],
+      agents: {
+        leo: { status: 'Reviewing', task: 'Sizing API stories' },
+        sofia: { status: 'Reviewing', task: 'Sizing UI stories' },
+      },
     },
     {
-      delayMs: 2800,
+      delayMs: 2000,
       stage: 'planning',
-      progress: 58,
+      progress: 62,
       stories: [
         { id: 'story-4', status: 'ready' },
         { id: 'story-5', status: 'ready' },
         { id: 'story-1', status: 'in_progress' },
       ],
+      speakers: [
+        {
+          agentId: 'marcus',
+          hint: `Set the sprint goal: prove the core path for ${product} end-to-end.`,
+          fallbackMessage: `Sprint goal: prove the core path for ${product} end-to-end.`,
+          fallbackTask: 'Facilitating planning poker',
+          thinkingStatus: 'Thinking',
+          speakingStatus: 'Speaking',
+        },
+        {
+          agentId: 'priya',
+          hint: 'Flag a key dependency risk (e.g. auth ↔ API coupling).',
+          fallbackMessage: 'Watch the auth ↔ API coupling — sequence those carefully.',
+          fallbackTask: 'Flagging dependency risks',
+          thinkingStatus: 'Thinking',
+          speakingStatus: 'Speaking',
+        },
+      ],
       agents: {
-        marcus: { status: 'Speaking', task: 'Facilitating planning poker' },
         aria: { status: 'Thinking', task: 'Protecting product focus' },
-        priya: { status: 'Thinking', task: 'Flagging dependency risks' },
         leo: { status: 'Idle', task: 'Estimate submitted' },
         sofia: { status: 'Idle', task: 'Estimate submitted' },
         jordan: { status: 'Writing', task: 'Risk notes for QA' },
       },
-      activity: [
-        {
-          agentId: 'marcus',
-          message: 'Sprint goal: prove the core path for ' + product + ' end-to-end.',
-          kind: 'chat',
-        },
-        {
-          agentId: 'priya',
-          message: 'Watch the auth ↔ API coupling — sequence those carefully.',
-          kind: 'chat',
-        },
-      ],
     },
     {
-      delayMs: 3000,
-      progress: 68,
+      delayMs: 1800,
+      progress: 72,
       stories: [
         { id: 'story-2', status: 'in_progress' },
         { id: 'story-5', status: 'in_progress' },
         { id: 'story-6', status: 'ready' },
         { id: 'story-7', status: 'ready' },
       ],
+      speakers: [
+        {
+          agentId: 'marcus',
+          hint: 'Confirm the board is updated: owners clear, dependencies tagged.',
+          fallbackMessage: 'Board updated. Owners clear. Dependencies tagged.',
+          fallbackTask: 'Publishing sprint board',
+          thinkingStatus: 'Writing',
+          speakingStatus: 'Speaking',
+          kind: 'status',
+        },
+      ],
       agents: {
-        marcus: { status: 'Writing', task: 'Publishing sprint board' },
         leo: { status: 'Thinking', task: 'Prepping auth foundation' },
         sofia: { status: 'Thinking', task: 'Prepping navigation shell' },
         jordan: { status: 'Reviewing', task: 'Mapping stories → test cases' },
       },
-      activity: [
-        {
-          agentId: 'marcus',
-          message: 'Board updated. Owners clear. Dependencies tagged.',
-          kind: 'status',
-        },
-      ],
     },
     {
-      delayMs: 2800,
+      delayMs: 2000,
       stage: 'implementation',
-      progress: 78,
+      progress: 82,
       stories: [
         { id: 'story-1', status: 'review' },
         { id: 'story-3', status: 'in_progress' },
@@ -228,40 +288,57 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         { id: 'story-7', status: 'in_progress' },
         { id: 'story-4', status: 'in_progress' },
       ],
-      agents: {
-        aria: { status: 'Reviewing', task: 'Checking delivery against vision' },
-        marcus: { status: 'Speaking', task: 'Kickoff stand-up' },
-        priya: { status: 'Reviewing', task: 'Guarding architectural seams' },
-        leo: { status: 'Writing', task: 'Implementing API contracts' },
-        sofia: { status: 'Writing', task: 'Building responsive shell' },
-        jordan: { status: 'Writing', task: 'Drafting smoke tests' },
-      },
-      activity: [
+      speakers: [
         {
           agentId: 'marcus',
-          message: 'Implementation kickoff. Focus: auth, shell, and contracts first.',
-          kind: 'chat',
+          hint: 'Kick off implementation stand-up: focus auth, shell, contracts.',
+          fallbackMessage: 'Implementation kickoff. Focus: auth, shell, and contracts first.',
+          fallbackTask: 'Kickoff stand-up',
+          thinkingStatus: 'Thinking',
+          speakingStatus: 'Speaking',
         },
         {
           agentId: 'leo',
-          message: 'Starting Auth & session foundation — stubbing providers.',
-          kind: 'chat',
+          hint: 'Say what backend work you are starting first.',
+          fallbackMessage: 'Starting Auth & session foundation — stubbing providers.',
+          fallbackTask: 'Implementing API contracts',
+          thinkingStatus: 'Writing',
+          speakingStatus: 'Speaking',
         },
         {
           agentId: 'sofia',
-          message: 'Navigation shell scaffolding up. Dark tokens applied.',
-          kind: 'chat',
+          hint: 'Say what frontend scaffolding you are landing.',
+          fallbackMessage: 'Navigation shell scaffolding up. Dark tokens applied.',
+          fallbackTask: 'Building responsive shell',
+          thinkingStatus: 'Writing',
+          speakingStatus: 'Speaking',
         },
       ],
+      agents: {
+        aria: { status: 'Reviewing', task: 'Checking delivery against vision' },
+        priya: { status: 'Reviewing', task: 'Guarding architectural seams' },
+        jordan: { status: 'Writing', task: 'Drafting smoke tests' },
+      },
     },
     {
-      delayMs: 3200,
-      progress: 88,
+      delayMs: 2200,
+      progress: 90,
       stories: [
         { id: 'story-1', status: 'done' },
         { id: 'story-2', status: 'review' },
         { id: 'story-5', status: 'review' },
         { id: 'story-8', status: 'ready' },
+      ],
+      speakers: [
+        {
+          agentId: 'jordan',
+          hint: 'Status update on what moved to Done/Review and that QA plan is next.',
+          fallbackMessage: 'Vision story Done. Domain model in Review. QA plan next.',
+          fallbackTask: 'Aligning on QA plan',
+          thinkingStatus: 'Reviewing',
+          speakingStatus: 'Speaking',
+          kind: 'status',
+        },
       ],
       agents: {
         aria: { status: 'Idle', task: 'Vision check complete' },
@@ -269,20 +346,12 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         priya: { status: 'Writing', task: 'Architecture decision record' },
         leo: { status: 'Writing', task: 'Landing API happy paths' },
         sofia: { status: 'Reviewing', task: 'Polish empty & error states' },
-        jordan: { status: 'Speaking', task: 'Aligning on QA plan' },
       },
-      activity: [
-        {
-          agentId: 'jordan',
-          message: 'Vision story Done. Domain model in Review. QA plan next.',
-          kind: 'status',
-        },
-      ],
     },
     {
-      delayMs: 3000,
+      delayMs: 2000,
       stage: 'qa_planning',
-      progress: 95,
+      progress: 96,
       stories: [
         { id: 'story-2', status: 'done' },
         { id: 'story-5', status: 'done' },
@@ -290,68 +359,83 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         { id: 'story-3', status: 'review' },
         { id: 'story-4', status: 'review' },
       ],
+      speakers: [
+        {
+          agentId: 'jordan',
+          hint: `Publish the QA plan for ${product}: happy path, abuse cases, goal checks.`,
+          fallbackMessage: `QA plan live: happy path, abuse cases, and goal checks for ${product}.`,
+          fallbackTask: `Acceptance suite for ${product}`,
+          thinkingStatus: 'Writing',
+          speakingStatus: 'Speaking',
+        },
+        {
+          agentId: 'marcus',
+          hint: 'State exit criteria in one tight line.',
+          fallbackMessage: 'Exit criteria: core journey green, no P0 open, AC signed.',
+          fallbackTask: 'Confirming exit criteria',
+          thinkingStatus: 'Reviewing',
+          speakingStatus: 'Speaking',
+        },
+      ],
       agents: {
-        jordan: { status: 'Writing', task: `Acceptance suite for ${product}` },
-        marcus: { status: 'Reviewing', task: 'Confirming exit criteria' },
         leo: { status: 'Reviewing', task: 'Pairing on API edge cases' },
         sofia: { status: 'Reviewing', task: 'Pairing on UI edge cases' },
         priya: { status: 'Idle', task: 'On call for design questions' },
         aria: { status: 'Reviewing', task: 'Sign-off readiness' },
       },
-      activity: [
-        {
-          agentId: 'jordan',
-          message: `QA plan live: happy path, abuse cases, and goal checks for ${product}.`,
-          kind: 'chat',
-        },
-        {
-          agentId: 'marcus',
-          message: 'Exit criteria: core journey green, no P0 open, AC signed.',
-          kind: 'chat',
-        },
-      ],
     },
     {
-      delayMs: 2600,
+      delayMs: 1600,
       stage: 'complete',
       progress: 100,
       stories: [
         { id: 'story-3', status: 'done' },
         { id: 'story-8', status: 'review' },
       ],
+      speakers: [
+        {
+          agentId: 'aria',
+          hint: 'Close the session: thank the team, confirm stories planned and QA ready.',
+          fallbackMessage: `${product} team aligned. Stories planned, owners clear, QA ready. Nice work, everyone.`,
+          fallbackTask: 'Closing the session',
+          thinkingStatus: 'Thinking',
+          speakingStatus: 'Speaking',
+        },
+      ],
       agents: {
-        aria: { status: 'Speaking', task: 'Closing the session' },
         marcus: { status: 'Idle', task: 'Board stable' },
         priya: { status: 'Idle', task: 'Architecture parked cleanly' },
         leo: { status: 'Idle', task: 'API work in flight' },
         sofia: { status: 'Idle', task: 'UI work in flight' },
         jordan: { status: 'Idle', task: 'QA plan ready for execution' },
       },
-      activity: [
-        {
-          agentId: 'aria',
-          message: `${product} team aligned. Stories planned, owners clear, QA ready. Nice work, everyone.`,
-          kind: 'chat',
-        },
-        {
-          agentId: 'system',
-          message: 'Simulation complete — board remains interactive.',
-          kind: 'system',
-        },
+      systemActivity: [
+        { message: 'Simulation complete — board remains interactive.', kind: 'system' },
       ],
     },
   ];
 }
 
+export interface SimulationOptions {
+  brief: ProductBrief;
+  apiKey?: string;
+}
+
 export class SimulationEngine {
   private state: SimulationState;
   private listeners = new Set<Listener>();
-  private timers: ReturnType<typeof setTimeout>[] = [];
   private storyPool: UserStory[] = [];
+  private apiKey: string;
+  private abort: AbortController | null = null;
+  private runToken = 0;
 
-  constructor(brief: ProductBrief) {
+  constructor(opts: SimulationOptions) {
+    const brief = opts.brief;
     const now = Date.now();
+    this.apiKey = (opts.apiKey ?? '').trim();
+    // Local fallback pool until Claude stories arrive (or if no key).
     this.storyPool = generateStories(brief, now);
+    const aiMode = this.apiKey ? 'Claude live' : 'scripted fallback (add API key)';
     this.state = {
       brief,
       stage: 'discovery',
@@ -363,7 +447,7 @@ export class SimulationEngine {
         {
           id: 'boot',
           agentId: 'system',
-          message: `Ops room online — assembling team for ${brief.name || 'new product'}.`,
+          message: `Ops room online — ${aiMode}. Assembling team for ${brief.name || 'new product'}.`,
           timestamp: now,
           kind: 'system',
         },
@@ -384,24 +468,190 @@ export class SimulationEngine {
   }
 
   start(): void {
-    const script = buildScript(this.state.brief);
-    let elapsed = 0;
-    script.forEach((beat) => {
-      elapsed += beat.delayMs;
-      const timer = setTimeout(() => this.applyBeat(beat), elapsed);
-      this.timers.push(timer);
-    });
+    this.stop();
+    this.abort = new AbortController();
+    const token = ++this.runToken;
+    void this.run(token, this.abort.signal);
   }
 
   stop(): void {
-    this.timers.forEach(clearTimeout);
-    this.timers = [];
-    this.patch({ running: false });
+    this.abort?.abort();
+    this.abort = null;
+    this.runToken += 1;
+    if (this.state.running) {
+      this.patch({ running: false });
+    }
   }
 
-  private applyBeat(beat: ScriptBeat): void {
+  private async run(token: number, signal: AbortSignal): Promise<void> {
+    const script = buildScript(this.state.brief);
+    try {
+      for (const beat of script) {
+        if (token !== this.runToken || signal.aborted) return;
+        await sleep(beat.delayMs, signal);
+        if (token !== this.runToken || signal.aborted) return;
+        await this.applyBeat(beat, signal);
+      }
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') return;
+      this.pushActivity({
+        agentId: 'system',
+        message: 'Simulation hitch — continuing with available updates.',
+        kind: 'system',
+      });
+      this.patch({ running: false });
+    }
+  }
+
+  private recentLines(limit = 4): string[] {
+    return this.state.activity
+      .filter((a) => a.kind === 'chat' || a.kind === 'status')
+      .slice(0, limit)
+      .map((a) => {
+        const name = a.agentId === 'system' ? 'System' : getAgent(a.agentId).name.split(' ')[0];
+        return `${name}: ${a.message}`;
+      });
+  }
+
+  private pushActivity(item: {
+    agentId: string;
+    message: string;
+    kind?: ActivityItem['kind'];
+  }): void {
     const now = Date.now();
+    const activity = [
+      {
+        id: `act-${now}-${Math.random().toString(36).slice(2, 7)}`,
+        agentId: item.agentId,
+        message: item.message,
+        timestamp: now,
+        kind: item.kind ?? 'chat',
+      },
+      ...this.state.activity,
+    ].slice(0, 60);
+    this.patch({ activity });
+  }
+
+  private async lineForSpeaker(
+    speaker: SpeakerBeat,
+    stage: StageId,
+    signal: AbortSignal,
+  ): Promise<{ message: string; task: string; fromAi: boolean }> {
+    if (!this.apiKey) {
+      return {
+        message: speaker.fallbackMessage,
+        task: speaker.fallbackTask,
+        fromAi: false,
+      };
+    }
+    try {
+      const agent = getAgent(speaker.agentId);
+      const text = await chatClaude({
+        apiKey: this.apiKey,
+        system: systemPromptForAgent(speaker.agentId),
+        user: beatUserPrompt({
+          agent,
+          brief: this.state.brief,
+          stage,
+          hint: speaker.hint,
+          recentActivity: this.recentLines(),
+        }),
+        maxTokens: 160,
+        signal,
+      });
+      const message = text.replace(/^["']|["']$/g, '').trim() || speaker.fallbackMessage;
+      return {
+        message: message.slice(0, 280),
+        task: speaker.fallbackTask,
+        fromAi: true,
+      };
+    } catch {
+      return {
+        message: speaker.fallbackMessage,
+        task: speaker.fallbackTask,
+        fromAi: false,
+      };
+    }
+  }
+
+  private async applyBeat(beat: ScriptBeat, signal: AbortSignal): Promise<void> {
+    const stageForAi = beat.stage ?? this.state.stage;
+
+    // Show Thinking/Writing while awaiting Claude
+    if (beat.speakers?.length) {
+      const agents = { ...this.state.agents };
+      for (const s of beat.speakers) {
+        agents[s.agentId] = {
+          id: s.agentId,
+          status: s.thinkingStatus ?? 'Thinking',
+          currentTask: s.fallbackTask,
+        };
+      }
+      this.patch({ agents });
+    }
+
+    // Story spawn (Claude JSON with fallback)
+    let stories = this.state.stories.map((s) => ({ ...s }));
+    if (beat.spawnStories && stories.length === 0) {
+      if (this.apiKey) {
+        // Mark Marcus/Jordan busy while generating
+        const agents = { ...this.state.agents };
+        agents.marcus = {
+          id: 'marcus',
+          status: 'Writing',
+          currentTask: 'Generating story backlog with Claude',
+        };
+        this.patch({ agents });
+        this.pushActivity({
+          agentId: 'system',
+          message: 'Claude is drafting user stories…',
+          kind: 'system',
+        });
+        const { stories: generated, source } = await generateStoriesWithClaude(
+          this.state.brief,
+          this.apiKey,
+          Date.now(),
+          signal,
+        );
+        this.storyPool = generated;
+        this.pushActivity({
+          agentId: 'system',
+          message:
+            source === 'claude'
+              ? 'Story backlog generated by Claude.'
+              : 'Story backlog using local fallback (Claude unavailable).',
+          kind: 'system',
+        });
+      }
+      stories = this.storyPool.map((s) => ({ ...s, status: 'backlog' as const }));
+    }
+
+    // Resolve speaker lines (parallel)
+    const speakerResults: {
+      speaker: SpeakerBeat;
+      message: string;
+      task: string;
+    }[] = [];
+    if (beat.speakers?.length) {
+      const settled = await Promise.all(
+        beat.speakers.map(async (speaker) => {
+          const result = await this.lineForSpeaker(speaker, stageForAi, signal);
+          return { speaker, ...result };
+        }),
+      );
+      speakerResults.push(...settled);
+    }
+
+    if (signal.aborted) return;
+
     const agents = { ...this.state.agents };
+    for (const r of speakerResults) {
+      agents[r.speaker.agentId] = {
+        id: r.speaker.agentId,
+        status: r.speaker.speakingStatus ?? 'Speaking',
+        currentTask: r.task,
+      };
+    }
     if (beat.agents) {
       for (const [id, patch] of Object.entries(beat.agents)) {
         if (!patch) continue;
@@ -413,10 +663,6 @@ export class SimulationEngine {
       }
     }
 
-    let stories = this.state.stories.map((s) => ({ ...s }));
-    if (beat.spawnStories && stories.length === 0) {
-      stories = this.storyPool.map((s) => ({ ...s, status: 'backlog' as const }));
-    }
     if (beat.stories) {
       for (const upd of beat.stories) {
         const idx = stories.findIndex((s) => s.id === upd.id);
@@ -427,14 +673,24 @@ export class SimulationEngine {
     }
 
     const activity = [...this.state.activity];
-    if (beat.activity) {
-      for (const a of beat.activity) {
+    const now = Date.now();
+    for (const r of speakerResults) {
+      activity.unshift({
+        id: `act-${now}-${Math.random().toString(36).slice(2, 7)}`,
+        agentId: r.speaker.agentId,
+        message: r.message,
+        timestamp: now,
+        kind: r.speaker.kind ?? 'chat',
+      });
+    }
+    if (beat.systemActivity) {
+      for (const a of beat.systemActivity) {
         activity.unshift({
-          id: `act-${now}-${Math.random().toString(36).slice(2, 7)}`,
-          agentId: a.agentId,
+          id: `act-${now}-sys-${Math.random().toString(36).slice(2, 7)}`,
+          agentId: 'system',
           message: a.message,
           timestamp: now,
-          kind: a.kind ?? 'chat',
+          kind: a.kind ?? 'system',
         });
       }
     }

@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { LaunchScreen } from './src/screens/LaunchScreen';
+import { LaunchScreen, LaunchPayload } from './src/screens/LaunchScreen';
 import { DashboardScreen } from './src/screens/DashboardScreen';
-import { ProductBrief } from './src/types';
 
 export default function App() {
-  const [brief, setBrief] = useState<ProductBrief | null>(null);
+  const [session, setSession] = useState<LaunchPayload | null>(null);
 
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      {brief ? (
-        <DashboardScreen brief={brief} onReset={() => setBrief(null)} />
+      {session ? (
+        <DashboardScreen
+          brief={session.brief}
+          apiKey={session.apiKey}
+          onReset={() => setSession(null)}
+        />
       ) : (
-        <LaunchScreen onStart={setBrief} />
+        <LaunchScreen onStart={setSession} />
       )}
     </SafeAreaProvider>
   );
