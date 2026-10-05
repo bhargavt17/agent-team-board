@@ -78,7 +78,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'aria',
           hint: 'Kick off discovery: frame the outcome and ask the team to clarify before architecture.',
-          fallbackMessage: `Kickoff: ${product}. Let's clarify the outcome before we touch architecture.`,
+          fallbackMessage: `${product} is fog until we name the outcome. Clarity first — architecture after.`,
           fallbackTask: `Framing vision for ${product}`,
           thinkingStatus: 'Thinking',
           speakingStatus: 'Speaking',
@@ -95,7 +95,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'aria',
           hint: 'Lock goals and non-goals from the brief in one crisp update.',
-          fallbackMessage: `Goals locked: ${brief.goals.slice(0, 120) || 'deliver a focused MVP'}.`,
+          fallbackMessage: `North star locked: ${brief.goals.slice(0, 100) || 'deliver a focused MVP'}. Anything that doesn't serve it is noise.`,
           fallbackTask: 'Capturing goals & non-goals',
           thinkingStatus: 'Writing',
           speakingStatus: 'Speaking',
@@ -103,7 +103,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'marcus',
           hint: 'Commit to closing discovery this session; no zombie tickets.',
-          fallbackMessage: 'I want discovery closed in this session — no zombie tickets.',
+          fallbackMessage: 'Discovery closes this session. Every open question gets an owner — no zombie tickets.',
           fallbackTask: 'Drafting discovery notes',
           thinkingStatus: 'Writing',
           speakingStatus: 'Speaking',
@@ -121,7 +121,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'priya',
           hint: 'Sketch the system shape: modular core, API edge, honor constraints from the brief.',
-          fallbackMessage: `Architecture pass: modular core, clear API edge — ${brief.constraints.slice(0, 90) || 'keep v1 lean'}.`,
+          fallbackMessage: `Shape: modular core behind a thin API edge. Tradeoff — ${brief.constraints.slice(0, 80) || 'keep v1 lean'}. No platform theater.`,
           fallbackTask: `Sketching system for ${product}`,
           thinkingStatus: 'Thinking',
           speakingStatus: 'Speaking',
@@ -141,7 +141,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'leo',
           hint: 'Propose API shape / contracts for this product.',
-          fallbackMessage: 'Propose resource-oriented APIs with a shared error model.',
+          fallbackMessage: 'Resource APIs, shared error envelope, idempotent writes. Contract first — then code.',
           fallbackTask: 'Drafting API contracts',
           thinkingStatus: 'Writing',
           speakingStatus: 'Speaking',
@@ -149,7 +149,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'sofia',
           hint: 'Call out phone-first UI constraints for the shell.',
-          fallbackMessage: 'UI shell should stay responsive on phone first — tablet/web as stretch.',
+          fallbackMessage: 'Phone-first shell, readable empty states, motion that earns its keep. Tablet can wait.',
           fallbackTask: 'Checking flow against shell',
           thinkingStatus: 'Reviewing',
           speakingStatus: 'Speaking',
@@ -168,7 +168,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'marcus',
           hint: 'Drive story breakdown: everyone owns clarity, not just tickets.',
-          fallbackMessage: `Breaking ${product} into shippable stories. Everyone owns clarity, not just tickets.`,
+          fallbackMessage: `Breaking ${product} into shippable stories. Clarity is owned — tickets are just the receipt.`,
           fallbackTask: 'Driving story breakdown',
           thinkingStatus: 'Thinking',
           speakingStatus: 'Speaking',
@@ -197,7 +197,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'jordan',
           hint: 'Harden acceptance criteria on the top vision/domain stories — testable verbs only.',
-          fallbackMessage: 'AC tightened on the vision + domain stories — testable verbs only.',
+          fallbackMessage: 'AC tightened on vision + domain — testable verbs only. Prove it or rewrite it.',
           fallbackTask: 'Hardening acceptance criteria',
           thinkingStatus: 'Reviewing',
           speakingStatus: 'Speaking',
@@ -205,7 +205,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'marcus',
           hint: 'Move the top three stories into Ready and note ordering by risk.',
-          fallbackMessage: 'Moving top three into Ready.',
+          fallbackMessage: 'Top three → Ready. Owners named; risk order published.',
           fallbackTask: 'Ordering backlog by risk',
           thinkingStatus: 'Writing',
           speakingStatus: 'Speaking',
@@ -230,7 +230,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'marcus',
           hint: `Set the sprint goal: prove the core path for ${product} end-to-end.`,
-          fallbackMessage: `Sprint goal: prove the core path for ${product} end-to-end.`,
+          fallbackMessage: `Sprint goal: prove ${product} end-to-end. Critical-path owners — talk to me by EOD if blocked.`,
           fallbackTask: 'Facilitating planning poker',
           thinkingStatus: 'Thinking',
           speakingStatus: 'Speaking',
@@ -238,7 +238,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'priya',
           hint: 'Flag a key dependency risk (e.g. auth ↔ API coupling).',
-          fallbackMessage: 'Watch the auth ↔ API coupling — sequence those carefully.',
+          fallbackMessage: 'Auth ↔ API is the coupling risk. Lock the auth contract before feature endpoints.',
           fallbackTask: 'Flagging dependency risks',
           thinkingStatus: 'Thinking',
           speakingStatus: 'Speaking',
@@ -264,7 +264,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'marcus',
           hint: 'Confirm the board is updated: owners clear, dependencies tagged.',
-          fallbackMessage: 'Board updated. Owners clear. Dependencies tagged.',
+          fallbackMessage: "Board's live. Owners named, deps tagged — nothing orphaned.",
           fallbackTask: 'Publishing sprint board',
           thinkingStatus: 'Writing',
           speakingStatus: 'Speaking',
@@ -292,7 +292,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'marcus',
           hint: 'Kick off implementation stand-up: focus auth, shell, contracts.',
-          fallbackMessage: 'Implementation kickoff. Focus: auth, shell, and contracts first.',
+          fallbackMessage: "Kickoff. Sequence: auth, shell, contracts. Ping me the moment you're blocked.",
           fallbackTask: 'Kickoff stand-up',
           thinkingStatus: 'Thinking',
           speakingStatus: 'Speaking',
@@ -300,7 +300,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'leo',
           hint: 'Say what backend work you are starting first.',
-          fallbackMessage: 'Starting Auth & session foundation — stubbing providers.',
+          fallbackMessage: 'Auth/session foundation next — stub providers, lock the token contract.',
           fallbackTask: 'Implementing API contracts',
           thinkingStatus: 'Writing',
           speakingStatus: 'Speaking',
@@ -308,7 +308,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'sofia',
           hint: 'Say what frontend scaffolding you are landing.',
-          fallbackMessage: 'Navigation shell scaffolding up. Dark tokens applied.',
+          fallbackMessage: 'Nav shell up, dark tokens in. Empty + error states before chrome polish.',
           fallbackTask: 'Building responsive shell',
           thinkingStatus: 'Writing',
           speakingStatus: 'Speaking',
@@ -333,7 +333,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'jordan',
           hint: 'Status update on what moved to Done/Review and that QA plan is next.',
-          fallbackMessage: 'Vision story Done. Domain model in Review. QA plan next.',
+          fallbackMessage: 'Vision → Done. Domain model in Review. QA plan next — prove the happy path.',
           fallbackTask: 'Aligning on QA plan',
           thinkingStatus: 'Reviewing',
           speakingStatus: 'Speaking',
@@ -363,7 +363,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'jordan',
           hint: `Publish the QA plan for ${product}: happy path, abuse cases, goal checks.`,
-          fallbackMessage: `QA plan live: happy path, abuse cases, and goal checks for ${product}.`,
+          fallbackMessage: `QA plan live for ${product}: happy path, abuse cases, goal checks. Soft verbs get rejected.`,
           fallbackTask: `Acceptance suite for ${product}`,
           thinkingStatus: 'Writing',
           speakingStatus: 'Speaking',
@@ -371,7 +371,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'marcus',
           hint: 'State exit criteria in one tight line.',
-          fallbackMessage: 'Exit criteria: core journey green, no P0 open, AC signed.',
+          fallbackMessage: 'Exit: core journey green, zero P0s, AC signed. Clock starts now.',
           fallbackTask: 'Confirming exit criteria',
           thinkingStatus: 'Reviewing',
           speakingStatus: 'Speaking',
@@ -396,7 +396,7 @@ function buildScript(brief: ProductBrief): ScriptBeat[] {
         {
           agentId: 'aria',
           hint: 'Close the session: thank the team, confirm stories planned and QA ready.',
-          fallbackMessage: `${product} team aligned. Stories planned, owners clear, QA ready. Nice work, everyone.`,
+          fallbackMessage: `${product} is pointed. Stories planned, owners clear, QA armed. Signal over noise — well done.`,
           fallbackTask: 'Closing the session',
           thinkingStatus: 'Thinking',
           speakingStatus: 'Speaking',

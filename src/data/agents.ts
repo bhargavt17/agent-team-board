@@ -8,6 +8,7 @@ export const TEAM: AgentDef[] = [
     title: 'Director',
     badge: 'VISION',
     initials: 'AC',
+    tagline: 'Cuts to the outcome',
   },
   {
     id: 'marcus',
@@ -16,6 +17,7 @@ export const TEAM: AgentDef[] = [
     title: 'Engineering Manager',
     badge: 'PLAN',
     initials: 'MW',
+    tagline: 'Owners, deadlines, unblocks',
   },
   {
     id: 'priya',
@@ -24,6 +26,7 @@ export const TEAM: AgentDef[] = [
     title: 'Architect',
     badge: 'SYS',
     initials: 'PN',
+    tagline: 'Tradeoffs over buzzwords',
   },
   {
     id: 'leo',
@@ -32,6 +35,7 @@ export const TEAM: AgentDef[] = [
     title: 'Backend Dev',
     badge: 'API',
     initials: 'LP',
+    tagline: 'APIs, data, contracts',
   },
   {
     id: 'sofia',
@@ -40,6 +44,7 @@ export const TEAM: AgentDef[] = [
     title: 'Frontend Dev',
     badge: 'UI',
     initials: 'SR',
+    tagline: 'Clarity users can feel',
   },
   {
     id: 'jordan',
@@ -48,6 +53,7 @@ export const TEAM: AgentDef[] = [
     title: 'QA / Tester',
     badge: 'QA',
     initials: 'JB',
+    tagline: 'Prove it — or fix it',
   },
 ];
 

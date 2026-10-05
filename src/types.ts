@@ -39,6 +39,8 @@ export interface AgentDef {
   title: string;
   badge: string;
   initials: string;
+  /** One-line personality tag shown under the name (subtle). */
+  tagline: string;
 }
 
 export interface AgentState {

@@ -134,7 +134,7 @@ export function LaunchScreen({ onStart }: Props) {
                 </View>
                 <View>
                   <Text style={styles.chipName}>{a.name.split(' ')[0]}</Text>
-                  <Text style={styles.chipRole}>{a.title}</Text>
+                  <Text style={styles.chipRole}>{a.tagline}</Text>
                 </View>
               </View>
             ))}

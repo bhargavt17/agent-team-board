@@ -26,6 +26,9 @@ export function AgentCard({ agent, state, compact }: Props) {
           <Text style={styles.name} numberOfLines={1}>
             {agent.name}
           </Text>
+          <Text style={styles.tagline} numberOfLines={1}>
+            {agent.tagline}
+          </Text>
           <View style={styles.roleRow}>
             <View style={[styles.badge, { backgroundColor: `${accent}22` }]}>
               <Text style={[styles.badgeText, { color: accent }]}>{agent.badge}</Text>
@@ -95,7 +98,15 @@ const styles = StyleSheet.create({
   name: {
     ...typography.bodyStrong,
     color: colors.text,
-    marginBottom: 2,
+    marginBottom: 1,
+  },
+  tagline: {
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    color: colors.textDim,
+    fontStyle: 'italic',
+    marginBottom: 4,
   },
   roleRow: {
     flexDirection: 'row',
