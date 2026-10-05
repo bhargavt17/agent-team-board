@@ -1,6 +1,6 @@
 const API_URL = 'https://api.anthropic.com/v1/messages';
-/** Haiku for all agent beats + story JSON — fast & cheap. */
-export const CLAUDE_MODEL = 'claude-haiku-4-5';
+/** Claude Opus (max tier) for all agent beats + story JSON. */
+export const CLAUDE_MODEL = 'claude-opus-5-5';
 const ANTHROPIC_VERSION = '2023-06-01';
 
 export class ClaudeError extends Error {

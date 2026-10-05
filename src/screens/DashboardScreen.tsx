@@ -63,7 +63,7 @@ export function DashboardScreen({ brief, apiKey, onReset }: Props) {
             <Text style={styles.brandSub}>
               {state.running ? 'Live simulation' : 'Simulation complete'}
               {' · '}
-              {live ? 'Claude' : 'Scripted fallback'}
+              {live ? 'Claude Opus 5.5' : 'Scripted fallback'}
             </Text>
           </View>
           <Pressable onPress={onReset} style={styles.resetBtn}>

@@ -2,7 +2,7 @@
 
 Polished **Expo / React Native** ops-room simulation. Enter a product brief and watch a six-person agent team (Director, EM, Architect, Backend, Frontend, QA) discover, architecture, story-break, plan, kick off implementation, and draft QA — live on the board.
 
-Agents are powered by **Anthropic Claude** (`claude-haiku-4-5`) when an API key is present, with graceful scripted fallbacks if the key is missing or a call fails.
+Agents are powered by **Anthropic Claude** (`claude-opus-5-5`) when an API key is present, with graceful scripted fallbacks if the key is missing or a call fails.
 
 Cross-platform: **iOS · Android · Web**.
 
@@ -21,7 +21,7 @@ Cross-platform: **iOS · Android · Web**.
 
 - Cinematic dark ops-room UI with role color accents and pulse status indicators
 - Launch form for product name, description, goals, constraints (+ example brief)
-- **Claude-powered** agent chat + story JSON generation (Haiku)
+- **Claude-powered** agent chat + story JSON generation (Claude Opus 5.5)
 - Thinking / Writing status while awaiting model responses
 - Stages: Discovery → Architecture → Story breakdown → Planning → Impl. kickoff → QA planning
 - Agent roster with live status (Thinking / Writing / Reviewing / Idle / Blocked / Speaking)
@@ -91,7 +91,7 @@ src/
   types.ts
   data/agents.ts
   ai/
-    anthropicClient.ts  # Messages API (Haiku)
+    anthropicClient.ts  # Messages API (Claude Opus 5.5)
     prompts.ts          # Role + story prompts
     apiKey.ts           # env + AsyncStorage
     generateStoriesWithClaude.ts
@@ -104,6 +104,6 @@ src/
 
 ## Notes
 
-- Model: `claude-haiku-4-5` for chat beats and story JSON.
+- Model: `claude-opus-5-5` for chat beats and story JSON.
 - API: `POST https://api.anthropic.com/v1/messages` with `x-api-key` + `anthropic-version: 2023-06-01`.
 - `.env` is gitignored; only `.env.example` is committed.

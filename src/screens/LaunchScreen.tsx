@@ -144,7 +144,7 @@ export function LaunchScreen({ onStart }: Props) {
             <View style={styles.providerRow}>
               <Text style={styles.providerLabel}>AI provider</Text>
               <View style={styles.providerPill}>
-                <Text style={styles.providerPillText}>Claude (Anthropic)</Text>
+                <Text style={styles.providerPillText}>Claude Opus 5.5 (Anthropic)</Text>
               </View>
             </View>
 
